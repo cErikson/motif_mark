@@ -6,6 +6,13 @@ Project:Motif_Mark
 Motif_mark searches for a user defined set of motifs in a fasta file of genes/mRNAs. 
 Using a aho-Corasick search tree the program is able to create a JSON file or SVG plot that defines the location of diffrent classes of motifs in relation to exons.
 """
+
+# The tree builder seems to function like the example, the problem seems to be with retrival
+#
+#
+#
+#
+
 ##### Debug #####
 testing=True
 
@@ -46,21 +53,28 @@ class motif_rec:
         self.exons = self.add_exons(seq)
         self.seq = seq if keep_seq is True else None
 
-    def add_motifs(self, seq, tree):
+    def add_motifs(self, seq, root):
         '''
         take the seq and the aho tree and return {motif_type_A:{match_seq_X:[pos1, pos2], match_seq_Y:[pos1]}, motif_type_B:...}
         Also look for exons, since were iterating over the seq.
         '''
+        seq=seq.lower()
         results={} # inti the results 
-        for i, atom in enumerate(seq): # for each letter in the seq 
-            if True in tree: # if there is a match in the tree
-                for hit in tree[True]: # for each hit
+        node = root
+        for i in range(len(seq)):
+            while node != None and not seq[i] in [x for x in node.keys() if x != False and x != True]:
+                node = node[False]
+            if node == None:
+                node = root
+                continue
+            node = node[seq[i]]
+            if True in node: 
+                for hit in node[True]: # for each hit
                     motif = results.setdefault(hit[1],{}) # add/move to motif type 
                     pos = motif.setdefault(hit[0],[]) # add/move to the motif seq 
-                    pos.append(i) # Add the postion it was found
-            tree=tree.get(atom.lower(), tree[False]) # Move along an edge, if not avalible move to failure node.
+                    pos.append(i-len(hit[0])+1) # Add the postion it was found
         return results
-                    
+        
     def add_exons(self, seq):
         'take seq with exons in uppercase return [(exon_start,exon_stop), ...]. zero-based inclusive '
         i = 0 # int index
@@ -77,7 +91,6 @@ class motif_rec:
         
     def export_as_dict(self):
         pass
-        
         
 ##### DEFS #####
 
@@ -107,7 +120,7 @@ def grow_aho_tree(motif_file):
             fnode = wnode[False]
             while fnode != None and not key in fnode: # while there is a failure node and the edge isn't in failure 
                 fnode = fnode[False] # move to the fnode and check conditions
-            nnode[False] = fnode[key] if fnode else root # add that node as nnodes failure. 
+            nnode[False] = fnode[key] if fnode is not None else root # add that node as nnodes failure. 
             if True in nnode[False]:
                 nnode.setdefault(True, [])
                 nnode[True] += nnode[False][True] if True in nnode[False] else [] # and add the things that the failure node found
@@ -128,4 +141,3 @@ def yield_fasta(fasta):
             yield header, seq # yield data
 
 ##### MAIN #####
-mot
