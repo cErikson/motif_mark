@@ -7,12 +7,6 @@ Motif_mark searches for a user defined set of motifs in a fasta file of genes/mR
 Using a aho-Corasick search tree the program is able to create a JSON file or SVG plot that defines the location of diffrent classes of motifs in relation to exons.
 """
 
-# The tree builder seems to function like the example, the problem seems to be with retrival
-#
-#
-#
-#
-
 ##### Debug #####
 testing=True
 
@@ -20,6 +14,7 @@ testing=True
 import argparse as arg
 import pdb
 import sys
+import cairo as cr
 
 
 
@@ -40,6 +35,7 @@ else:   # Else test
     sys.stderr.writelines("!!!!!___RUNNING_IN_TESTING_MODE_WITH_TEST_ARGS___!!!!!\n")
     class test_args(object):
         motifs='/home/christian/lab/bgmp/motif_mark/test_motifs.txt'
+        fasta='/home/christian/lab/bgmp/motif_mark/test_genes.fa'
     ARGS = test_args()
 
 
@@ -52,16 +48,16 @@ class motif_rec:
         self.motifs = self.add_motifs(seq, tree)
         self.exons = self.add_exons(seq)
         self.seq = seq if keep_seq is True else None
-
+    
     def add_motifs(self, seq, root):
         '''
         take the seq and the aho tree and return {motif_type_A:{match_seq_X:[pos1, pos2], match_seq_Y:[pos1]}, motif_type_B:...}
         Also look for exons, since were iterating over the seq.
         '''
-        seq=seq.lower()
+        seq=seq.lower() # sanitize
         results={} # inti the results 
-        node = root
-        for i in range(len(seq)):
+        node = root # don't forget home
+        for i in range(len(seq)): 
             while node != None and not seq[i] in [x for x in node.keys() if x != False and x != True]:
                 node = node[False]
             if node == None:
@@ -74,7 +70,7 @@ class motif_rec:
                     pos = motif.setdefault(hit[0],[]) # add/move to the motif seq 
                     pos.append(i-len(hit[0])+1) # Add the postion it was found
         return results
-        
+    
     def add_exons(self, seq):
         'take seq with exons in uppercase return [(exon_start,exon_stop), ...]. zero-based inclusive '
         i = 0 # int index
@@ -88,10 +84,11 @@ class motif_rec:
                 exons.append((rise,i if i==leng else i-1)) # a fall happened or ended while in exon, save the exon 
             i+=1
         return(exons)
-        
+    
     def export_as_dict(self):
         pass
-        
+
+
 ##### DEFS #####
 
 def grow_aho_tree(motif_file):
@@ -126,6 +123,7 @@ def grow_aho_tree(motif_file):
                 nnode[True] += nnode[False][True] if True in nnode[False] else [] # and add the things that the failure node found
     return root # return the tree        
 
+
 def yield_fasta(fasta):
     '''Make a generator that yields (seq_header, seq) for each entry''' 
     fhs=open(fasta, 'r')
@@ -140,4 +138,40 @@ def yield_fasta(fasta):
                 l=fhs.readline().strip() # read seq
             yield header, seq # yield data
 
+def plot_genes(genes, output="/home/christian/lab/bgmp/motif_mark/example.svg", geney=100, x=1000, y=1000):
+    #!!!!!! add motif color method
+    col_dict={'a':(1,0,0,1), 'b':(0,1,0,1), 'c':(0,0,1,1)}
+    max_leng=max(x.leng for x in genes)
+    num_genes=len(genes)
+    #styles
+    line_col, line_wid = (0,0,0,1), 0.1 #base line
+    exon_col, exon_wid = (0,0,0,1), 0.20 #exon boxes
+    mot_wid = 0.30 # motif width
+
+    surface = cr.SVGSurface(output, max_leng*4, geney*num_genes)
+    ctx = cr.Context (surface)
+    ctx.scale (max_leng*4, geney*num_genes) # Normalizing the canvas
+
+    for i,obj in enumerate(genes): # for each gene obj
+         ctx.set_source_rgba(*line_col); ctx.set_line_width (line_wid/num_genes); ctx.move_to(0, (i+1)*1/(num_genes+1)); ctx.line_to(obj.leng/max_leng, (i+1)*1/(num_genes+1)); ctx.stroke() # draw base line across screen
+         for e in obj.exons: #for each exon
+             ctx.set_source_rgba(*exon_col); ctx.rectangle(e[0]/max_leng, (i+1)*1/(num_genes+1)-exon_wid/num_genes/2, e[1]/max_leng-e[0]/max_leng, exon_wid/num_genes); ctx.fill() # draw exon box
+         for mk,mv in obj.motifs.items(): # for each motif type
+             ctx.set_source_rgba(*col_dict[mk]) # set color
+             for sk, sv in mv.items(): # for each motif seq
+                 #!!!! make seq ledgend
+                 m_leng=len(sk)
+                 for x in sv: # for each location
+                     ctx.rectangle(x/max_leng, (i+1)*1/(num_genes+1)-mot_wid/num_genes/2, m_leng/max_leng, mot_wid/num_genes); ctx.fill() # add motif mark
+#    ctx.select_font_face("Mono", cr.FONT_SLANT_NORMAL, cr.FONT_WEIGHT_BOLD); ctx.set_font_size(.01)
+#    for x, letter in enumerate(obj.seq):
+#        xbearing, ybearing, width, height, xadvance, yadvance = (ctx.text_extents(letter))
+#        ctx.move_to(x/max_leng - xbearing - width / 2, (i+1)*1/(num_genes+1) - ybearing - height / 2)
+#        ctx.show_text(letter)
+
+    surface.finish() # Output to PNG
+
 ##### MAIN #####
+stree=grow_aho_tree(ARGS.motifs)
+motifs=[motif_rec(name, seq, stree) for name, seq in yield_fasta(ARGS.fasta)]
+plot_genes(motifs)
