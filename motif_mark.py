@@ -22,11 +22,13 @@ if __name__ == "__main__" and testing != True:
     # Positional mandatory arguments
     parser.add_argument("fasta", help="fasta file of genes/mRNAs, with exons in upper case", type=str)
     parser.add_argument("motifs", help="tsv of motif_seq, motif_type, optional_plot_color", type=str)
+    parser.add_argument("mol", help="Molecule type: RNA or DNA", type=str)
     # Optional arguments
     parser.add_argument("-j", "--json", help="json file: output.json", type=str, default=None)
     parser.add_argument("-p", "--plot", help="SVG plot: output.svg", type=str, default=None)
     parser.add_argument("-x", "--plotx", help="SVG x size", type=int, default=1000)
     parser.add_argument("-y", "--ploty", help="SVG y size", type=int, default=100)
+
     # Parse arguments
     ARGS = parser.parse_args()
     
@@ -38,8 +40,9 @@ else:   # Else test
         fasta='/home/christian/lab/bgmp/motif_mark/test_genes.fa'
         json='/home/christian/lab/bgmp/motif_mark/example.json'
         plot='/home/christian/lab/bgmp/motif_mark/example.svg'
-        plotx=4000
+        plotx=8000
         ploty=1000
+        mol='RNA'
     ARGS = test_args()
 
 
@@ -57,7 +60,7 @@ class motif_rec:
         '''
         take the seq and the aho tree and return {motif_type_A:{match_seq_X:[pos1, pos2], match_seq_Y:[pos1]}, motif_type_B:...}
         '''
-        seq=seq.lower() # sanitize
+        seq=seq.upper() # sanitize
         results={} # inti the results 
         node = root # don't forget home
         for i in range(len(seq)): 
@@ -108,24 +111,31 @@ def yield_fasta(fasta):
                 l=fhs.readline().strip() # read seq
             yield header, seq # yield data
 
-def expand_degen(seq):
+def expand_degen(motif_file, mol='DNA'):
     from itertools import product
-    d={'A': 'A', 'B': 'CGT', 'C': 'C', 'D': 'AGT', 'G': 'G', 'H': 'ACT', 'K': 'GT', 'M': 'AC', 'N': 'GATC', 'R': 'AG', 'S': 'CG', 'T': 'T', 'V': 'ACG', 'W': 'AT', 'X': 'GATC', 'Y': 'CT'}
-    return list(map("".join, product(*map(d.get, seq)))) #get the degen translation 
+    if mol.upper() == 'DNA':
+        d={'A': 'A', 'B': 'CGT', 'C': 'C', 'D': 'AGT', 'G': 'G', 'H': 'ACT', 'K': 'GT', 'M': 'AC', 'N': 'GATC', 'R': 'AG', 'S': 'CG', 'T': 'T', 'V': 'ACG', 'W': 'AT', 'X': 'GATC', 'Y': 'CT'} 
+    elif mol.upper() == 'RNA':
+        d={'A': 'A', 'B': 'CGU', 'C': 'C', 'D': 'AGU', 'G': 'G', 'H': 'ACU', 'K': 'GU', 'M': 'AC', 'N': 'GAUC', 'R': 'AG', 'S': 'CG', 'U': 'U', 'V': 'ACG', 'W': 'AU', 'X': 'GAUC', 'Y': 'CU'}
+    else:
+        raise ValueError("Mol didn't match DNA or RNA" )
+    expanded=[]
+    with open(motif_file, 'r') as fh: # open the motif file
+       for line in fh: # for each line in the motif file
+          path, motif = line.split()[0:2] # grab the pattern and motif type 
+          expanded.extend([[e,motif] for e in list(map("".join, product(*map(d.get, path.upper())))) ])
+    return expanded #get the degen translation 
 
-def grow_aho_tree(motif_file):
+def grow_aho_tree(motifs):
     '''
     Grow the Aho search tree from the motif patterns 
-    '''
-    #!!!!! ADD_DEGENERATES
-    with open(motif_file, 'r') as fh: # open the motif file
-        root = {False:None} # plant the tree root
-        for line in fh: # for each line in the motif file
-            path, motif = line.lower().split()[0:2] # grab the pattern and motif type 
-            branch = root # move to the root
-            for edge in path: # for each charater in patten 
-                branch = branch.setdefault(edge, {False:None}) # move along the branch in tree and add the edges in the pattern
-            branch[True] = [(path, motif)] # finally at the end of the branch,save the pattern and motif type. 
+    '''         
+    root = {False:None} # plant the tree root
+    for path, motif in motifs : # for each line in the motif file
+        branch = root # move to the root
+        for edge in path: # for each charater in patten 
+            branch = branch.setdefault(edge, {False:None}) # move along the branch in tree and add the edges in the pattern
+        branch[True] = [(path, motif)] # finally at the end of the branch,save the pattern and motif type. 
     
     queue=[]
     for k,v in root.items():
@@ -162,9 +172,9 @@ def plot_genes(genes, output, devx=8000, devy=1000):
     max_leng=max(x.leng for x in genes)
     num_genes=len(genes)
     # style ajustments for plotting
-    line_col, line_wid = (0,0,0,1), 0.1 #base line
-    exon_col, exon_wid = (0,0,0,1), 0.20 #exon boxes
-    col_dict, mot_wid=  motifs2colors(motifs, value=.75, alpha=.5), 0.30 # motif box style
+    line_col, line_wid = (0,0,0,1), 0.15 #base line
+    exon_col, exon_wid = (0,0,0,1), 0.25#exon boxes
+    col_dict, mot_wid=  motifs2colors(motifs, value=.75, alpha=.75), 0.35# motif box style
     seq_col,seq_font=(1,1,1,1),"Mono" # sequence text style
     lab_col, lab_font, lab_size=(0,0,0,1), "Mono", 0.25 # gene labels style
     leg_level, leg_start, leg_lab = 1-1/(num_genes+1)*.5, 0.01, 'Motifs: ' # y, x, title
@@ -196,7 +206,7 @@ def plot_genes(genes, output, devx=8000, devy=1000):
 
 ##### MAIN #####
 sys.stderr.write('Building Aho-Corasick search tree\n')
-stree=grow_aho_tree(ARGS.motifs)
+stree=grow_aho_tree(expand_degen(ARGS.motifs, ARGS.mol))
 sys.stderr.write('Searching with tree\n')
 motifs=[motif_rec(name, seq, stree) for name, seq in yield_fasta(ARGS.fasta)]
 if ARGS.json is not None:
