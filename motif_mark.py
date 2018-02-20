@@ -23,8 +23,8 @@ if __name__ == "__main__" and testing != True:
     parser.add_argument("fasta", help="fasta file of genes/mRNAs, with exons in upper case", type=str)
     parser.add_argument("motifs", help="tsv of motif_seq, motif_type, optional_plot_color", type=str)
     # Optional arguments
-    parser.add_argument("-j", "--json", help="json file output", type=str, default=None)
-    parser.add_argument("-p", "--plot", help="SVG plot output", type=str, default=None)
+    parser.add_argument("-j", "--json", help="json file: output.json", type=str, default=None)
+    parser.add_argument("-p", "--plot", help="SVG plot: output.svg", type=str, default=None)
     parser.add_argument("-x", "--plotx", help="SVG x size", type=int, default=1000)
     parser.add_argument("-y", "--ploty", help="SVG y size", type=int, default=100)
     # Parse arguments
@@ -188,10 +188,10 @@ def plot_genes(genes, output, devx=8000, devy=1000):
              ctx.move_to(x/max_leng + width/2, (i+1)*1/(num_genes+1) - ybearing - height / 2); ctx.show_text(letter) # move to bases position, draw letter
          ctx.set_source_rgba(*lab_col); ctx.select_font_face(lab_font, cr.FONT_SLANT_NORMAL, cr.FONT_WEIGHT_BOLD); ctx.set_font_matrix(cr.Matrix(1/(num_genes+1)*lab_size*(devy/devx), 0, 0, 1/(num_genes+1)*lab_size, 0, 0)) # set label font and normilize
          ctx.move_to(0, (i+1)*1/(num_genes+1)-(exon_wid/num_genes)); ctx.show_text(obj.name) # draw text
-    ctx.move_to(leg_start,leg_level); ctx.show_text(leg_lab);  leg_start+=ctx.text_extents(leg_lab)[4]
+    ctx.move_to(leg_start,leg_level); ctx.show_text(leg_lab);  leg_start+=ctx.text_extents(leg_lab)[4] #start legend
     for k,v in col_dict.items():
-        ctx.move_to(leg_start,leg_level); ctx.set_source_rgba(*v); ctx.show_text(k)
-        leg_start+=ctx.text_extents('  '+k)[4]
+        ctx.move_to(leg_start,leg_level); ctx.set_source_rgba(*v); ctx.show_text(k) # wtite legend
+        leg_start+=ctx.text_extents('  '+k)[4] # find next position
     surface.finish() # Output to PNG
 
 ##### MAIN #####
