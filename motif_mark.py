@@ -45,6 +45,8 @@ else:   # Else test
         mol='RNA'
     ARGS = test_args()
 
+if ARGS.json == None and ARGS.plot == None:
+    sys.exit('No output setting provided by user, see help. Exiting')
 
 ##### Classes #####
 class motif_rec:
@@ -130,13 +132,14 @@ def grow_aho_tree(motifs):
     '''
     Grow the Aho search tree from the motif patterns 
     '''         
+    #grow tree
     root = {False:None} # plant the tree root
     for path, motif in motifs : # for each line in the motif file
         branch = root # move to the root
         for edge in path: # for each charater in patten 
             branch = branch.setdefault(edge, {False:None}) # move along the branch in tree and add the edges in the pattern
         branch[True] = [(path, motif)] # finally at the end of the branch,save the pattern and motif type. 
-    
+    #prep failure link work
     queue=[]
     for k,v in root.items():
         if k != True and k != False: # grab all the nodes off root
@@ -177,7 +180,7 @@ def plot_genes(genes, output, devx=8000, devy=1000):
     col_dict, mot_wid=  motifs2colors(motifs, value=.75, alpha=.75), 0.35# motif box style
     seq_col,seq_font=(1,1,1,1),"Mono" # sequence text style
     lab_col, lab_font, lab_size=(0,0,0,1), "Mono", 0.25 # gene labels style
-    leg_level, leg_start, leg_lab = 1-1/(num_genes+1)*.5, 0.01, 'Motifs: ' # y, x, title
+    leg_level, leg_start, leg_lab = 1-1/(num_genes+1)*.25, 0.01, 'Motifs: ' # y, x, title
 
     surface = cr.SVGSurface(output, devx, devy)
     ctx = cr.Context (surface)
