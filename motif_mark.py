@@ -50,7 +50,7 @@ if __name__ == "__main__" and testing != True:
       }""", formatter_class=RawTextHelpFormatter)
     # Positional mandatory arguments
     parser.add_argument("fasta", help="fasta file of genes/mRNAs, with exons in upper case", type=str)
-    parser.add_argument("motifs", help="tsv of motif_seq, motif_type, optional_plot_color", type=str)
+    parser.add_argument("motifs", help="tsv of motif_seq \t motif_id", type=str)
     parser.add_argument("mol", help="Molecule type: RNA or DNA", type=str)
     # Optional arguments
     parser.add_argument("-j", "--json", help="json file: output.json", type=str, default=None)
