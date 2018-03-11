@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
 #!/bin/python
+
 """
 Project:Motif_Mark
 @author: Christian Erikson
@@ -8,17 +8,46 @@ Using a aho-Corasick search tree the program is able to create a JSON file or SV
 """
 
 ##### Debug #####
-testing=True
+testing=False
 
 ###### Imports #####
 import argparse as arg
-import pdb
 import sys
+from json import loads
+from argparse import RawTextHelpFormatter
 
 
 ##### Args #####
 if __name__ == "__main__" and testing != True:
-    parser = arg.ArgumentParser()
+    parser = arg.ArgumentParser(description='Motif_mark searches for a user defined set of motifs in a fasta file of genes/mRNAs. \n Using a aho-Corasick search tree the program is able to create a JSON file or SVG plot that defines the location of diffrent classes of motifs in relation to exons.',
+                                epilog=""" 
+    This is the default params for plotting, you can control the plotter by passing in these key:value pairs through --styles.
+    Note: Passing functions will not work. JSON format.\n
+     {"line_col":(0,0,0,1),             #base line: color
+      "line_wid":0.15,                  # base line: width
+      "exon_col":(0,0,0,1),             # exon box: color
+      "exon_wid":0.25,                  # exon box: width
+      "col_dict": motifs2colors(motifs, value=.75, alpha=.75), # motif box: color mappings. {"Motif_ID1": [R,G,B,A], "Motif_ID2":[1,.075,.5,.8]}
+      "mot_wid":0.35,                   # motif box: width
+      "seq_col":(1,1,1,1),              # sequence text: color
+      "seq_font":"Mono",                # sequence text: font
+      "lab_col":(0,0,0,1),              # gene labels: color
+      "lab_font":"Mono",                # gene labels: font
+      "lab_size": 0.25,                 # gene labels: size
+      "lab_start":0.01,                 # gene labels:  x_offset
+      "axis_col":(.0,0,0,1),            # axis: color,
+      "axis_wid":0.1,                   # axis: width,
+      "axis_tick": 10**((math.log10(max_leng)//1)-1), # axis: tick every n bp
+      "axis_text_size": 0.3,            # axis: size
+      "axis_text_col":(0,0,0,1),        # axis: tick col
+      "axis_font":"Mono",               # axis: tick font
+      "leg_box_y":0.1,                  # legend: area y
+      "leg_start":0.01,                 # legend: x_offset
+      "leg_lab":"Motifs: ",             # legend: leg_title
+      "leg_col":(0,0,0,1),              # legend: color
+      "leg_text_size":0.3,              # legend: size
+      "leg_font": "Mono""               # legend: font
+      }""", formatter_class=RawTextHelpFormatter)
     # Positional mandatory arguments
     parser.add_argument("fasta", help="fasta file of genes/mRNAs, with exons in upper case", type=str)
     parser.add_argument("motifs", help="tsv of motif_seq, motif_type, optional_plot_color", type=str)
@@ -28,7 +57,8 @@ if __name__ == "__main__" and testing != True:
     parser.add_argument("-p", "--plot", help="SVG plot: output.svg", type=str, default=None)
     parser.add_argument("-x", "--plotx", help="SVG x size", type=int, default=1000)
     parser.add_argument("-y", "--ploty", help="SVG y size", type=int, default=100)
-
+    parser.add_argument('--mod_color', type=loads, default=None, help='Specify custom colors. Usage: a python dict where keys are the ID and values a list of RGBA bound by 0-1, must use ". \n "{"Motif_ID1": [R,G,B,A], "Motif_ID2":[1,.075,.5,.8]}"')
+    parser.add_argument('--styles', type=loads, default=None, help='Specify custom plotting parameters . Usage: "{"style": value, "lab_col":[1,0,0,1]}"')
     # Parse arguments
     ARGS = parser.parse_args()
     
@@ -43,10 +73,12 @@ else:   # Else test
         plotx=8000
         ploty=1000
         mol='RNA'
+        mod_color={"RBFOX":[1,0,0,1]}
+        styles={'axis_tick':50}
     ARGS = test_args()
 
 if ARGS.json == None and ARGS.plot == None:
-    sys.exit('No output setting provided by user, see help. Exiting')
+    sys.exit('No output setting provided by user, seek help. Exiting')
 
 ##### Classes #####
 class motif_rec:
@@ -172,39 +204,55 @@ def motifs2colors(motifs, sat=1,value=1,alpha=1):
 
 def plot_genes(genes, output, devx=8000, devy=1000):
     import cairo as cr
+    from math import log10
     max_leng=max(x.leng for x in genes)
     num_genes=len(genes)
     # style ajustments for plotting
-    line_col, line_wid = (0,0,0,1), 0.15 #base line
-    exon_col, exon_wid = (0,0,0,1), 0.25#exon boxes
-    col_dict, mot_wid=  motifs2colors(motifs, value=.75, alpha=.75), 0.35# motif box style
-    seq_col,seq_font=(1,1,1,1),"Mono" # sequence text style
-    lab_col, lab_font, lab_size=(0,0,0,1), "Mono", 0.25 # gene labels style
-    leg_level, leg_start, leg_lab = 1-1/(num_genes+1)*.25, 0.01, 'Motifs: ' # y, x, title
+    style={'line_col':(0,0,0,1), 'line_wid':0.15,  #base line
+          'exon_col':(0,0,0,1), 'exon_wid':0.25, #exon boxe
+          'col_dict': motifs2colors(motifs, value=.75, alpha=.75), 'mot_wid':0.35, # motif box style
+          'seq_col':(1,1,1,1), 'seq_font':"Mono", # sequence text style
+          'lab_col':(0,0,0,1), 'lab_font':"Mono", 'lab_size': 0.25, 'lab_start':0.01, # gene labels style
+          'axis_col':(.0,0,0,1), 'axis_wid':0.1, 'axis_tick': 10**((log10(max_leng)//1)-1), 'axis_text_size': 0.3, 'axis_text_col':(0,0,0,1),'axis_font':"Mono",
+          'leg_box_y':0.1, 'leg_start':0.01, 'leg_lab':"Motifs: ", 'leg_col':(0,0,0,1), 'leg_text_size':0.3, 'leg_font': "Mono"# legend area y, y, x, title
+          }
+    if ARGS.styles is not None:
+        style.update(ARGS.styles)
+        
+    # Custom colors 
+    if ARGS.mod_color is not None:
+        style['col_dict'].update(ARGS.mod_color)
 
     surface = cr.SVGSurface(output, devx, devy)
     ctx = cr.Context (surface)
-    ctx.scale (devx, devy) # Normalizing the canvas
+    ctx.scale (devx, devy*(1-style['leg_box_y'])) # Normalizing the canvas
     for i,obj in enumerate(genes): # for each gene obj
-         ctx.set_source_rgba(*line_col); ctx.set_line_width (line_wid/num_genes); ctx.move_to(0, (i+1)*1/(num_genes+1)); ctx.line_to(obj.leng/max_leng, (i+1)*1/(num_genes+1)); ctx.stroke() # draw base line across screen
+         ctx.set_source_rgba(*style['line_col']); ctx.set_line_width (style['line_wid']/num_genes); ctx.move_to(0, (i+1)*1/(num_genes+1)); ctx.line_to(obj.leng/max_leng, (i+1)*1/(num_genes+1)); ctx.stroke() # draw base line across screen
          for e in obj.exons: #for each exon
-             ctx.set_source_rgba(*exon_col); ctx.rectangle(e[0]/max_leng, (i+1)*1/(num_genes+1)-exon_wid/num_genes/2, (e[1]+1)/max_leng-e[0]/max_leng, exon_wid/num_genes); ctx.fill() # draw exon box
+             ctx.set_source_rgba(*style['exon_col']); ctx.rectangle(e[0]/max_leng, (i+1)*1/(num_genes+1)-style['exon_wid']/num_genes/2, (e[1]+1)/max_leng-e[0]/max_leng, style['exon_wid']/num_genes); ctx.fill() # draw exon box
          for mk,mv in obj.motifs.items(): # for each motif type
-             ctx.set_source_rgba(*col_dict[mk]) # set color
+             ctx.set_source_rgba(*style['col_dict'][mk]) # set color
              for sk, sv in mv.items(): # for each motif seq
                  m_leng=len(sk)
                  for x in sv: # for each location
-                     ctx.rectangle(x/max_leng, (i+1)*1/(num_genes+1)-mot_wid/num_genes/2, m_leng/max_leng, mot_wid/num_genes); ctx.fill() # add motif mark
-         ctx.set_source_rgba(*seq_col); ctx.select_font_face(seq_font, cr.FONT_SLANT_NORMAL, cr.FONT_WEIGHT_BOLD); ctx.set_font_matrix(cr.Matrix(1/max_leng, 0, 0, line_wid/num_genes, 0, 0)) # set seq font and normilize 
+                     ctx.rectangle(x/max_leng, (i+1)*1/(num_genes+1)-style['mot_wid']/num_genes/2, m_leng/max_leng, style['mot_wid']/num_genes); ctx.fill() # add motif mark
+         ctx.set_source_rgba(*style['seq_col']); ctx.select_font_face(style['seq_font'], cr.FONT_SLANT_NORMAL, cr.FONT_WEIGHT_BOLD); ctx.set_font_matrix(cr.Matrix(1/max_leng, 0, 0, style['line_wid']/num_genes, 0, 0)) # set seq font and normilize 
          for x, letter in enumerate(obj.seq): # for each base
              xbearing, ybearing, width, height, xadvance, yadvance = (ctx.text_extents(letter)) # grab letters dims
              ctx.move_to(x/max_leng + width/2, (i+1)*1/(num_genes+1) - ybearing - height / 2); ctx.show_text(letter) # move to bases position, draw letter
-         ctx.set_source_rgba(*lab_col); ctx.select_font_face(lab_font, cr.FONT_SLANT_NORMAL, cr.FONT_WEIGHT_BOLD); ctx.set_font_matrix(cr.Matrix(1/(num_genes+1)*lab_size*(devy/devx), 0, 0, 1/(num_genes+1)*lab_size, 0, 0)) # set label font and normilize
-         ctx.move_to(0, (i+1)*1/(num_genes+1)-(exon_wid/num_genes)); ctx.show_text(obj.name) # draw text
-    ctx.move_to(leg_start,leg_level); ctx.show_text(leg_lab);  leg_start+=ctx.text_extents(leg_lab)[4] #start legend
-    for k,v in col_dict.items():
-        ctx.move_to(leg_start,leg_level); ctx.set_source_rgba(*v); ctx.show_text(k) # wtite legend
-        leg_start+=ctx.text_extents('  '+k)[4] # find next position
+         ctx.set_source_rgba(*style['lab_col']); ctx.select_font_face(style['lab_font'], cr.FONT_SLANT_NORMAL, cr.FONT_WEIGHT_BOLD); ctx.set_font_matrix(cr.Matrix(1/(num_genes+1)*style['lab_size']*(devy/devx), 0, 0, 1/(num_genes+1)*style['lab_size'], 0, 0)) # set label font and normilize
+         ctx.move_to(0+style['lab_start'], (i+1)*1/(num_genes+1)-(style['exon_wid']/num_genes)); ctx.show_text(obj.name) # draw text
+    ctx.scale (1, 1+style['leg_box_y']) # Normalizing to full canvas
+    ctx.set_source_rgba(*style['axis_col']); ctx.set_line_width (style['axis_wid']/num_genes); ctx.move_to(0, 1-style['leg_box_y']); ctx.line_to(1, 1-style['leg_box_y']); ctx.stroke() # draw base line across screen
+    ctx.set_source_rgba(*style['axis_text_col']); ctx.select_font_face(style['axis_font'], cr.FONT_SLANT_NORMAL, cr.FONT_WEIGHT_BOLD); ctx.set_font_matrix(cr.Matrix(style['leg_box_y']*style['axis_text_size']*(devy/devx), 0, 0, style['leg_box_y']*style['axis_text_size'], 0, 0)) # set axis font and normilize 
+    for x in range(int(max_leng//style['axis_tick'])+1): # for each tick
+             xbearing, ybearing, width, height, xadvance, yadvance = (ctx.text_extents(letter)) # grab letters dims
+             ctx.move_to((style['axis_tick']*x)/max_leng, 1-style['leg_box_y']/3*2); ctx.show_text(str(int(style['axis_tick']*x))) # move to tick position, draw letter
+    ctx.select_font_face(style['leg_font'], cr.FONT_SLANT_NORMAL, cr.FONT_WEIGHT_BOLD); ctx.set_font_matrix(cr.Matrix(style['leg_box_y']*style['leg_text_size']*(devy/devx), 0, 0, style['leg_box_y']*style['leg_text_size'], 0, 0)) # set axis font and normilize 
+    ctx.set_source_rgba(*style['leg_col']);ctx.move_to(style['leg_start'],1-style['leg_box_y']/3+ctx.text_extents(style['leg_lab'])[4]/2); ctx.show_text(style['leg_lab']);  style['leg_start']+=ctx.text_extents(style['leg_lab'])[4] #start legend
+    for k,v in style['col_dict'].items():
+        ctx.move_to(style['leg_start'],1-style['leg_box_y']/3+ctx.text_extents(style['leg_lab'])[4]/2); ctx.set_source_rgba(*v); ctx.show_text(k) # wtite legend
+        style['leg_start']+=ctx.text_extents('  '+k)[4] # find next position
     surface.finish() # Output to PNG
 
 ##### MAIN #####
