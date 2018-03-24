@@ -8,7 +8,7 @@ Using a aho-Corasick search tree the program is able to create a JSON file or SV
 """
 
 ##### Debug #####
-testing=True
+testing=False
 
 ###### Imports #####
 import argparse as arg
@@ -67,8 +67,8 @@ if __name__ == "__main__" and testing != True:
 else:   # Else test
     sys.stderr.writelines("!!!!!___RUNNING_IN_TESTING_MODE_WITH_TEST_ARGS___!!!!!\nCHANGE_TESTING_TO_FALSE\n")
     class test_args(object):
-        motifs='/home/christian/lab/bgmp/motif_mark/leslie_motifs.txt'
-        fasta='/home/christian/lab/bgmp/motif_mark/leslie_genes.fa'
+        motifs='/home/christian/lab/bgmp/motif_mark/test_motifs.txt'
+        fasta='/home/christian/lab/bgmp/motif_mark/test_genes.fa'
         json='/home/christian/lab/bgmp/motif_mark/example.json'
         plot='/home/christian/lab/bgmp/motif_mark/example.svg'
         plotx=8000
