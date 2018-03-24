@@ -8,13 +8,14 @@ Using a aho-Corasick search tree the program is able to create a JSON file or SV
 """
 
 ##### Debug #####
-testing=False
+testing=True
 
 ###### Imports #####
 import argparse as arg
 import sys
 from json import loads
 from argparse import RawTextHelpFormatter
+
 
 
 ##### Args #####
@@ -66,13 +67,13 @@ if __name__ == "__main__" and testing != True:
 else:   # Else test
     sys.stderr.writelines("!!!!!___RUNNING_IN_TESTING_MODE_WITH_TEST_ARGS___!!!!!\nCHANGE_TESTING_TO_FALSE\n")
     class test_args(object):
-        motifs='/home/christian/lab/bgmp/motif_mark/test_motifs.txt'
-        fasta='/home/christian/lab/bgmp/motif_mark/test_genes.fa'
+        motifs='/home/christian/lab/bgmp/motif_mark/leslie_motifs.txt'
+        fasta='/home/christian/lab/bgmp/motif_mark/leslie_genes.fa'
         json='/home/christian/lab/bgmp/motif_mark/example.json'
         plot='/home/christian/lab/bgmp/motif_mark/example.svg'
         plotx=8000
         ploty=1000
-        mol='RNA'
+        mol='DNA'
         mod_color={"RBFOX":[1,0,0,1]}
         styles={'axis_tick':50}
     ARGS = test_args()
@@ -153,10 +154,13 @@ def expand_degen(motif_file, mol='DNA'):
         d={'A': 'A', 'B': 'CGU', 'C': 'C', 'D': 'AGU', 'G': 'G', 'H': 'ACU', 'K': 'GU', 'M': 'AC', 'N': 'GAUC', 'R': 'AG', 'S': 'CG', 'U': 'U', 'V': 'ACG', 'W': 'AU', 'X': 'GAUC', 'Y': 'CU'}
     else:
         raise ValueError("Mol didn't match DNA or RNA" )
+    wrong = {'DNA':'U','RNA':'T'}[mol]
     expanded=[]
     with open(motif_file, 'r') as fh: # open the motif file
        for line in fh: # for each line in the motif file
           path, motif = line.split()[0:2] # grab the pattern and motif type 
+          if wrong in path:
+              raise ValueError('In the motif `{0}` a {1} was found, the current mol type is {2}'.format(line.strip(), wrong, mol))
           expanded.extend([[e,motif] for e in list(map("".join, product(*map(d.get, path.upper())))) ])
     return expanded #get the degen translation 
 
@@ -269,4 +273,3 @@ if ARGS.plot is not None:
     sys.stderr.write('Writing plot to {}\n'.format(ARGS.plot))
     plot_genes(motifs, ARGS.plot, ARGS.plotx, ARGS.ploty)
 sys.stderr.write('DONE!\n')
-
